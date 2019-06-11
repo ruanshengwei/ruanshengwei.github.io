@@ -134,14 +134,14 @@
 
                         
                         <li>
-                            <a href="/archive/">Archives</a>
+                            <a href="/about/">About</a>
                         </li>
                         
                     
 
                         
                         <li>
-                            <a href="/about/">About</a>
+                            <a href="/archive/">Archives</a>
                         </li>
                         
                     
@@ -208,6 +208,45 @@
             
                 <!-- Main Content -->
 
+
+<div class="post-preview">
+
+    <a href="/archive/线程、线程池几个有意思的问题/">
+        <h2 class="post-title">
+            线程、线程池几个有意思的问题
+        </h2>
+        <h3 class="post-subtitle">
+            HashMap 多线程扩容如何形成环的 线程池参数 线程池集群 线程之间按顺序执行
+        </h3>
+        <div class="post-content-preview">
+            ###HashMap 多线程扩容如何形成环的
+
+
+简而言之。当扩容时，HashMap 扩大bucket 后，需要rehash 所有的值，放到新的位置之下。
+
+
+当其中一个位置存在冲突（具有链表）时，线程A和线程B 都会去重新计算位置（链表中每个值的新位置）。
+
+
+因为是链表，需要一个一个遍历下去，所以有两个引用，一个是当前的e 一个是next。算好e的位置后，再获取next的next，然后算......
+        </div>
+    </a>
+    
+        <p class="post-meta" style="margin: 10px 0;">
+            Posted by 阮圣伟 on
+            2019-06-11
+        </p>
+        <div class="tags">
+            
+              <a href="/tags/#开心一刻" title="开心一刻">开心一刻</a>
+            
+              <a href="/tags/#线程" title="线程">线程</a>
+            
+        </div>
+    
+
+</div>
+<hr>
 
 <div class="post-preview">
 
@@ -279,6 +318,14 @@ Optional 支持 --Support java.util.Optional as return type of mapper method (�
             <a href="/tags/#MyBatis" title="MyBatis" rel="1">MyBatis</a>
             
         
+            
+            <a href="/tags/#开心一刻" title="开心一刻" rel="1">开心一刻</a>
+            
+        
+            
+            <a href="/tags/#线程" title="线程" rel="1">线程</a>
+            
+        
     </div>
 </section>
 
@@ -332,6 +379,10 @@ Optional 支持 --Support java.util.Optional as return type of mapper method (�
     <ul>
       
         <li>
+          <a href="/archive/线程、线程池几个有意思的问题/">线程、线程池几个有意思的问题</a>
+        </li>
+      
+        <li>
           <a href="/archive/tk通用mapper-Optional支持/">tk通用mapper Optional支持</a>
         </li>
       
@@ -355,7 +406,7 @@ Optional 支持 --Support java.util.Optional as return type of mapper method (�
         
     <h5>ARCHIVES</h5>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">June 2019</a><span class="archive-list-count">1</span></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">June 2019</a><span class="archive-list-count">2</span></li></ul>
     </div>
 
         <hr>
