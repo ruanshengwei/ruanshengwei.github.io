@@ -151,14 +151,14 @@
 
                         
                         <li>
-                            <a href="/archive/">Archives</a>
+                            <a href="/tags/">Tags</a>
                         </li>
                         
                     
 
                         
                         <li>
-                            <a href="/tags/">Tags</a>
+                            <a href="/archive/">Archives</a>
                         </li>
                         
                     
@@ -214,7 +214,7 @@
                 col-md-10 col-md-offset-1
                 post-container">
 
-                <p>###HashMap 多线程扩容如何形成环的</p>
+                <h3 id="hashmap-多线程扩容如何形成环的">HashMap 多线程扩容如何形成环的</h3>
 <ul>
 <li>
 <p>简而言之。当扩容时，HashMap 扩大bucket 后，需要rehash 所有的值，放到新的位置之下。</p>
@@ -245,9 +245,9 @@
 </ul>
 </li>
 </ul>
-<p>###线程池参数</p>
+<h3 id="线程池参数">线程池参数</h3>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">*·corePool：核心线程池的大小。</span></span><br><span class="line"><span class="comment"> ·maximumPool：最大线程池的大小。</span></span><br><span class="line"><span class="comment"> ·keepAliveTime：线程存活时间</span></span><br><span class="line"><span class="comment"> ·TimeUnit：线程存活时间单位(SECONDS、MINUTES...)</span></span><br><span class="line"><span class="comment"> ·BlockingQueue：用来暂时保存任务的工作队列。</span></span><br><span class="line"><span class="comment"> ·RejectedExecutionHandler：当ThreadPoolExecutor已经关闭或ThreadPoolExecutor已经饱和</span></span><br><span class="line"><span class="comment">时（达到了最大线程池大小且工作队列已满），execute()方法将要调用的Handler。</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="title">ThreadPoolExecutor</span><span class="params">(<span class="keyword">int</span> corePoolSize,</span></span></span><br><span class="line"><span class="function"><span class="params">                          <span class="keyword">int</span> maximumPoolSize,</span></span></span><br><span class="line"><span class="function"><span class="params">                          <span class="keyword">long</span> keepAliveTime,</span></span></span><br><span class="line"><span class="function"><span class="params">                          TimeUnit unit,</span></span></span><br><span class="line"><span class="function"><span class="params">                          BlockingQueue&lt;Runnable&gt; workQueue,</span></span></span><br><span class="line"><span class="function"><span class="params">                          ThreadFactory threadFactory,</span></span></span><br><span class="line"><span class="function"><span class="params">                          RejectedExecutionHandler handler)</span></span></span><br></pre></td></tr></table></figure>
-<p>###线程池集群</p>
+<h3 id="线程池集群">线程池集群</h3>
 <blockquote>
 <p>有一个很有意思的问题：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&gt; 集群、每个集群有一个线程池，现在有很多个任务，有的任务计算量很大，有的任务IO量很大计算量很小。现在去每个线程池去拉取任务执行，有可能有的线程池总是拉取到计算量很大的任务，有的总是拉取到计算量很小的任务。如何优化？</span><br><span class="line">&gt;</span><br></pre></td></tr></table></figure>
@@ -255,7 +255,7 @@
 <p>我假设前提应该是一个线程池，这个不改变的情况下进行优化。</p>
 <p>我想到的有可以通过信号量来控制 IO 和 Cpu的任务总数。在判断信号量之后submit 任务。也可通过状态机等进行控制，原理同信号量相似。</p>
 <p><a href="https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/ThreadPoolCpuAndIOTasksDemo.java" target="_blank" rel="noopener">https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/ThreadPoolCpuAndIOTasksDemo.java</a></p>
-<p>###线程之间按顺序执行</p>
+<h3 id="线程之间按顺序执行">线程之间按顺序执行</h3>
 <p>这个问题的方法就很多。可以通过join、状态机、lockSupport等方式实现</p>
 <p><a href="https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/SequentiallyThread.java" target="_blank" rel="noopener">https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/SequentiallyThread.java</a></p>
 
@@ -318,7 +318,7 @@
         <div id="toc" class="toc-article">
         <strong class="toc-title">Contents</strong>
         
-          <ol class="nav">none</ol>
+          <ol class="toc-nav"><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#hashmap-多线程扩容如何形成环的"><span class="toc-nav-number">1.</span> <span class="toc-nav-text">HashMap &#x591A;&#x7EBF;&#x7A0B;&#x6269;&#x5BB9;&#x5982;&#x4F55;&#x5F62;&#x6210;&#x73AF;&#x7684;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#线程池参数"><span class="toc-nav-number">2.</span> <span class="toc-nav-text">&#x7EBF;&#x7A0B;&#x6C60;&#x53C2;&#x6570;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#线程池集群"><span class="toc-nav-number">3.</span> <span class="toc-nav-text">&#x7EBF;&#x7A0B;&#x6C60;&#x96C6;&#x7FA4;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#线程之间按顺序执行"><span class="toc-nav-number">4.</span> <span class="toc-nav-text">&#x7EBF;&#x7A0B;&#x4E4B;&#x95F4;&#x6309;&#x987A;&#x5E8F;&#x6267;&#x884C;</span></a></li></ol>
         
         </div>
       </aside>
