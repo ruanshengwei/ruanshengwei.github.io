@@ -14,11 +14,11 @@
     <script async defer src="https://buttons.github.io/buttons.js"></script>
     <title>
         
-          线程、线程池几个有意思的问题 - 阮圣伟 | Blog
+          ThreadLocal与WeakReference - 阮圣伟 | Blog
         
     </title>
 
-    <link rel="canonical" href="http://www.huweihuang.com/archive/线程、线程池几个有意思的问题/">
+    <link rel="canonical" href="http://www.huweihuang.com/archive/ThreadLocal与WeakReference/">
 
     <!-- Bootstrap Core CSS -->
     <link rel="stylesheet" href="/css/bootstrap.min.css">
@@ -93,11 +93,11 @@
                               <a class="tag" href="/tags/#线程" title="线程">线程</a>
                             
                         </div>
-                        <h1>线程、线程池几个有意思的问题</h1>
-                        <h2 class="subheading">HashMap 多线程扩容如何形成环的 线程池参数 线程池集群 线程之间按顺序执行</h2>
+                        <h1>ThreadLocal与WeakReference</h1>
+                        <h2 class="subheading"></h2>
                         <span class="meta">
                             Posted by 阮圣伟 on
-                            2019-06-11
+                            2019-06-13
                         </span>
                     </div>
                 
@@ -214,50 +214,48 @@
                 col-md-10 col-md-offset-1
                 post-container">
 
-                <h3 id="hashmap-多线程扩容如何形成环的">HashMap 多线程扩容如何形成环的</h3>
-<ul>
-<li>
-<p>简而言之。当扩容时，HashMap 扩大bucket 后，需要rehash 所有的值，放到新的位置之下。</p>
-</li>
-<li>
-<p>当其中一个位置存在冲突（具有链表）时，线程A和线程B 都会去重新计算位置（链表中每个值的新位置）。</p>
-</li>
-<li>
-<p>因为是链表，需要一个一个遍历下去，所以有两个引用，一个是当前的e 一个是next。算好e的位置后，再获取next的next，然后算next的位置。<br>
-	 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">do</span> &#123;</span><br><span class="line">  	<span class="comment">//next 是老的链表中的下一个，临时保存一下</span></span><br><span class="line">    Entry&lt;K,V&gt; next = e.next; <span class="comment">// &lt;--假设线程一执行到这里就被调度挂起了</span></span><br><span class="line">  	<span class="comment">//算出新的位置</span></span><br><span class="line">    <span class="keyword">int</span> i = indexFor(e.hash, newCapacity);</span><br><span class="line">  	<span class="comment">//把新位置的头元素赋值为这个元素（e）的next</span></span><br><span class="line">    e.next = newTable[i];</span><br><span class="line">  	<span class="comment">//把 e 赋值为新位置的头元素</span></span><br><span class="line">    newTable[i] = e;</span><br><span class="line">    <span class="comment">//e 更改引用。换成老链表中的值，继续搞下一个</span></span><br><span class="line">    e = next;</span><br><span class="line">&#125; <span class="keyword">while</span> (e != <span class="keyword">null</span>);</span><br></pre></td></tr></table></figure></p>
-</li>
-<li>
-<p>在遍历过程中，是从头开始遍历([bucket i]-&gt;3-&gt;7-&gt;null 从3开始 )。然后摆放时，把最新的摆放在新的头的位置（如果在新的长度mod之后还是在新的位置产生冲突后最终结果为[new bucket i]-&gt;7-&gt;3-&gt;null）。</p>
-</li>
-<li>
-<p>当两个线程同时开始rehash时，线程A在获取完e和next后被挂起。</p>
-</li>
-<li>
-<p>当线程B完成rehash之后。线程A开始rehash。</p>
-<ul>
-<li>A 的 e 指向3 老链表next 指向 7</li>
-<li>A 将 3 赋值为新位置的头元素。然后e变为老链表next 的值 7。然后要获取老链表next的next 7后面是3</li>
-<li>然后e（7）变为头元素（后一个元素为3）。e（7）的下一个新链表next为3。</li>
-<li>此时 老链表next为3 所以3 又被赋值为 头元素。3的新链表next变成原来是头元素的7</li>
-<li>老的链表中next已经为空。</li>
-<li>最后新链表中 3的next 为 7 。7 的next为 3。导致环形链表</li>
-<li>究其原因是原先只需要 3 7 算一下。最后变成了 3 7 3 算了三次。最后的 3 连到了 头元素 导致环形</li>
-</ul>
-</li>
-</ul>
-<h3 id="线程池参数">线程池参数</h3>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">*·corePool：核心线程池的大小。</span></span><br><span class="line"><span class="comment"> ·maximumPool：最大线程池的大小。</span></span><br><span class="line"><span class="comment"> ·keepAliveTime：线程存活时间</span></span><br><span class="line"><span class="comment"> ·TimeUnit：线程存活时间单位(SECONDS、MINUTES...)</span></span><br><span class="line"><span class="comment"> ·BlockingQueue：用来暂时保存任务的工作队列。</span></span><br><span class="line"><span class="comment"> ·RejectedExecutionHandler：当ThreadPoolExecutor已经关闭或ThreadPoolExecutor已经饱和</span></span><br><span class="line"><span class="comment">时（达到了最大线程池大小且工作队列已满），execute()方法将要调用的Handler。</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="title">ThreadPoolExecutor</span><span class="params">(<span class="keyword">int</span> corePoolSize,</span></span></span><br><span class="line"><span class="function"><span class="params">                          <span class="keyword">int</span> maximumPoolSize,</span></span></span><br><span class="line"><span class="function"><span class="params">                          <span class="keyword">long</span> keepAliveTime,</span></span></span><br><span class="line"><span class="function"><span class="params">                          TimeUnit unit,</span></span></span><br><span class="line"><span class="function"><span class="params">                          BlockingQueue&lt;Runnable&gt; workQueue,</span></span></span><br><span class="line"><span class="function"><span class="params">                          ThreadFactory threadFactory,</span></span></span><br><span class="line"><span class="function"><span class="params">                          RejectedExecutionHandler handler)</span></span></span><br></pre></td></tr></table></figure>
-<h3 id="线程池集群">线程池集群</h3>
+                <h3 id="threadlocal">ThreadLocal</h3>
 <blockquote>
-<p>有一个很有意思的问题：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&gt; 集群、每个集群有一个线程池，现在有很多个任务，有的任务计算量很大，有的任务IO量很大计算量很小。现在去每个线程池去拉取任务执行，有可能有的线程池总是拉取到计算量很大的任务，有的总是拉取到计算量很小的任务。如何优化？</span><br><span class="line">&gt;</span><br></pre></td></tr></table></figure>
+<p>对于ThreadLocal来说需要掌握的就是它的结构。以及在Thread中是如何工作的。</p>
 </blockquote>
-<p>我假设前提应该是一个线程池，这个不改变的情况下进行优化。</p>
-<p>我想到的有可以通过信号量来控制 IO 和 Cpu的任务总数。在判断信号量之后submit 任务。也可通过状态机等进行控制，原理同信号量相似。</p>
-<p><a href="https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/ThreadPoolCpuAndIOTasksDemo.java" target="_blank" rel="noopener">https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/ThreadPoolCpuAndIOTasksDemo.java</a></p>
-<h3 id="线程之间按顺序执行">线程之间按顺序执行</h3>
-<p>这个问题的方法就很多。可以通过join、状态机、lockSupport等方式实现</p>
-<p><a href="https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/SequentiallyThread.java" target="_blank" rel="noopener">https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/SequentiallyThread.java</a></p>
+<ul>
+<li>
+<p>ThreadLocal中有一个内部类ThreadLocalMap</p>
+</li>
+<li>
+<p>ThreadLocalMap 中 使用继承自WeakReference的 Entry来保存value 。类似HashMap 中含有 table[] ，ThreadLocalMap 中有 Entry[] (<strong>ThreadLocalMap是给Thread用的。每个Thread含有自己的ThreadLocalMap,里面通过ThreadLocal作为key 来存取值</strong>)</p>
+</li>
+</ul>
+<h3 id="threadlocal工作流程">ThreadLocal工作流程</h3>
+<p>假设 Java 容器中存在某一个静态ThreadLocal变量</p>
+<p>例如:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Center</span></span>&#123;</span><br><span class="line">		<span class="keyword">public</span> <span class="keyword">static</span> ThreadLocal&lt;String&gt; centerThreadLocal = <span class="keyword">new</span> ThreadLocal();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在Center中保存线程想要独自占有的变量副本。</p>
+<ul>
+<li>
+<p>当在线程A中执行centerThreadLocal.set(“value-A”)时，会获取当前线程(线程A)的 ThreadLocalMap然后将centerThreadLocal作为key，&quot;value-A&quot;作为value 包装成一个Entry 然后塞到Entry[]中。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"> <span class="comment">//Entry[]下标通过这个方式获得</span></span><br><span class="line"> <span class="keyword">int</span> i = key.threadLocalHashCode &amp; (len-<span class="number">1</span>);</span><br><span class="line"></span><br><span class="line"> <span class="comment">//如果e找出来不为空则执行内部代码。</span></span><br><span class="line"><span class="keyword">for</span> (Entry e = tab[i];</span><br><span class="line">                 e != <span class="keyword">null</span>;</span><br><span class="line">                 e = tab[i = nextIndex(i, len)]) &#123;</span><br><span class="line">                ThreadLocal&lt;?&gt; k = e.get();</span><br><span class="line">								<span class="comment">//看看是不是key 如果是则赋值</span></span><br><span class="line">                <span class="keyword">if</span> (k == key) &#123;</span><br><span class="line">                    e.value = value;</span><br><span class="line">                    <span class="keyword">return</span>;</span><br><span class="line">                &#125;</span><br><span class="line">								<span class="comment">//看看 Entry 中key是不是为null。如果为null则替换value</span></span><br><span class="line">                <span class="keyword">if</span> (k == <span class="keyword">null</span>) &#123;</span><br><span class="line">                    replaceStaleEntry(key, value, i);</span><br><span class="line">                    <span class="keyword">return</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"><span class="comment">//如果最后找到Entry为空。则新建一个Entry</span></span><br><span class="line">tab[i] = <span class="keyword">new</span> Entry(key, value);</span><br></pre></td></tr></table></figure>
+</li>
+<li>
+<p>当在线程A中执行centerThreadLocal.get()时。会获取当前线程(线程A)的 ThreadLocalMap然后将centerThreadLocal作为key，去ThreadLocalMap获取Entry,当第一次没获取到时，然后去Entry[]中一个一个往下找。不停地算下一个i的位置。每一个不为null的Entry都会被取出来进行key的比较。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> Entry <span class="title">getEntryAfterMiss</span><span class="params">(ThreadLocal&lt;?&gt; key, <span class="keyword">int</span> i, Entry e)</span> </span>&#123;</span><br><span class="line">            Entry[] tab = table;</span><br><span class="line">            <span class="keyword">int</span> len = tab.length;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">while</span> (e != <span class="keyword">null</span>) &#123;</span><br><span class="line">                ThreadLocal&lt;?&gt; k = e.get();</span><br><span class="line">                <span class="keyword">if</span> (k == key)</span><br><span class="line">                    <span class="keyword">return</span> e;</span><br><span class="line">                <span class="keyword">if</span> (k == <span class="keyword">null</span>)</span><br><span class="line">                    expungeStaleEntry(i);</span><br><span class="line">                <span class="keyword">else</span></span><br><span class="line">                    i = nextIndex(i, len);</span><br><span class="line">                e = tab[i];</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+<p>然后顺带着清理已经无效不需要的value</p>
+</li>
+<li>
+<p>当某一个时刻，该ThreadLocal不需要时，存在强引用的地方手动置null。然后在heap中 该ThreadLocal便不存在强引用。只剩下不同的线程中ThreadLocalMap中的Entry对它的WeakReference。当GC来临时。判定这个ThreadLocal是弱可达（只存在弱引用，无强引用）,于是所有线程中的保存该ThreadLocal的Entry中的弱引用都会被置null回收。此时那个Entry变成了只有value 没有reference的Entry（Entry.get == null ）。而这些value 会在下一次ThreadLocal操作时被发现然后置为null。等待回收。</p>
+</li>
+</ul>
+<h3 id="threadlocal-内存泄漏问题">ThreadLocal 内存泄漏问题</h3>
+<p>严格上来说，ThreadLocal存在部分情况内存泄漏（发生在ThreadLocalMap中）。但代码层面已经做好了手动帮助GC的代码。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//手动垃圾回收代码</span></span><br><span class="line">java.lang.ThreadLocal.ThreadLocalMap#expungeStaleEntry</span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">int</span> <span class="title">expungeStaleEntry</span><span class="params">(<span class="keyword">int</span> staleSlot)</span> </span>&#123;</span><br><span class="line">         ***</span><br><span class="line">         <span class="keyword">for</span> (i = nextIndex(staleSlot, len);</span><br><span class="line">              (e = tab[i]) != <span class="keyword">null</span>;</span><br><span class="line">              i = nextIndex(i, len)) &#123;</span><br><span class="line">             ThreadLocal&lt;?&gt; k = e.get();</span><br><span class="line">             <span class="keyword">if</span> (k == <span class="keyword">null</span>) &#123;</span><br><span class="line">               e.value = <span class="keyword">null</span>;<span class="comment">//这一步操作就是将value这部分无用的垃圾回收掉，在下一次GC的时候被回收</span></span><br><span class="line">               tab[i] = <span class="keyword">null</span>;</span><br><span class="line">               size--;</span><br><span class="line">             &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                 ***</span><br><span class="line">             &#125;</span><br><span class="line">         &#125;</span><br><span class="line">         <span class="keyword">return</span> i;</span><br><span class="line">     &#125;</span><br></pre></td></tr></table></figure>
+<p>只是如果不去调用ThreadLocal的set get size等方法。会存在内存泄漏问题。总的来说应该是ThreadLocalMap中的垃圾需要手动调用代码将垃圾的引用赋值为null才行。</p>
+<h3 id="threadlocalmap-hash冲突">ThreadLocalMap hash冲突</h3>
+<p>其实前文已经说到了。ThreadLocalMap不同于HashMap。当它存在冲突时并不会搞成链表的形式。而是往后+1</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">e = tab[i = nextIndex(i, len)</span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">nextIndex</span><span class="params">(<span class="keyword">int</span> i, <span class="keyword">int</span> len)</span> </span>&#123;</span><br><span class="line">     <span class="keyword">return</span> ((i + <span class="number">1</span> &lt; len) ? i + <span class="number">1</span> : <span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>WeakHashMap hash冲突时还是采用的链表形式。这个从Entry的结构中就能看出来</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">java.util.WeakHashMap.Entry</span><br><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">Entry</span>&lt;<span class="title">K</span>,<span class="title">V</span>&gt; <span class="keyword">extends</span> <span class="title">WeakReference</span>&lt;<span class="title">Object</span>&gt; <span class="keyword">implements</span> <span class="title">Map</span>.<span class="title">Entry</span>&lt;<span class="title">K</span>,<span class="title">V</span>&gt; </span>&#123;</span><br><span class="line">        V value;</span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">int</span> hash;</span><br><span class="line">        Entry&lt;K,V&gt; next;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="weakreference-简介">WeakReference 简介</h3>
+<p>WeakReference类似一个包装器。然后把一个Object包装进来。获得了一个对Object的弱引用。当GC过程中，发现该Object只有弱引用变成弱可达后，会直接把Object回收，并且把对Object的弱引用置为空，随后WeakReference的get方法会返回null。注意，并不会把WeakReference回收。WeakReference在使用过程中是个强引用的变量。</p>
 
                 
 
@@ -265,13 +263,9 @@
                 <!-- Pager -->
                 <ul class="pager">
                     
-                        <li class="previous">
-                            <a href="/archive/ThreadLocal与WeakReference/" data-toggle="tooltip" data-placement="top" title="ThreadLocal与WeakReference">&larr; Previous Post</a>
-                        </li>
-                    
                     
                         <li class="next">
-                            <a href="/archive/tk通用mapper-Optional支持/" data-toggle="tooltip" data-placement="top" title="tk通用mapper Optional支持">Next Post &rarr;</a>
+                            <a href="/archive/线程、线程池几个有意思的问题/" data-toggle="tooltip" data-placement="top" title="线程、线程池几个有意思的问题">Next Post &rarr;</a>
                         </li>
                     
                 </ul>
@@ -322,7 +316,7 @@
         <div id="toc" class="toc-article">
         <strong class="toc-title">Contents</strong>
         
-          <ol class="toc-nav"><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#hashmap-多线程扩容如何形成环的"><span class="toc-nav-number">1.</span> <span class="toc-nav-text">HashMap &#x591A;&#x7EBF;&#x7A0B;&#x6269;&#x5BB9;&#x5982;&#x4F55;&#x5F62;&#x6210;&#x73AF;&#x7684;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#线程池参数"><span class="toc-nav-number">2.</span> <span class="toc-nav-text">&#x7EBF;&#x7A0B;&#x6C60;&#x53C2;&#x6570;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#线程池集群"><span class="toc-nav-number">3.</span> <span class="toc-nav-text">&#x7EBF;&#x7A0B;&#x6C60;&#x96C6;&#x7FA4;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#线程之间按顺序执行"><span class="toc-nav-number">4.</span> <span class="toc-nav-text">&#x7EBF;&#x7A0B;&#x4E4B;&#x95F4;&#x6309;&#x987A;&#x5E8F;&#x6267;&#x884C;</span></a></li></ol>
+          <ol class="toc-nav"><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#threadlocal"><span class="toc-nav-number">1.</span> <span class="toc-nav-text">ThreadLocal</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#threadlocal工作流程"><span class="toc-nav-number">2.</span> <span class="toc-nav-text">ThreadLocal&#x5DE5;&#x4F5C;&#x6D41;&#x7A0B;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#threadlocal-内存泄漏问题"><span class="toc-nav-number">3.</span> <span class="toc-nav-text">ThreadLocal &#x5185;&#x5B58;&#x6CC4;&#x6F0F;&#x95EE;&#x9898;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#threadlocalmap-hash冲突"><span class="toc-nav-number">4.</span> <span class="toc-nav-text">ThreadLocalMap hash&#x51B2;&#x7A81;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#weakreference-简介"><span class="toc-nav-number">5.</span> <span class="toc-nav-text">WeakReference &#x7B80;&#x4ECB;</span></a></li></ol>
         
         </div>
       </aside>
