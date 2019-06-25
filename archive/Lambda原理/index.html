@@ -14,11 +14,11 @@
     <script async defer src="https://buttons.github.io/buttons.js"></script>
     <title>
         
-          线程、线程池几个有意思的问题 - 阮圣伟 | Blog
+          Lambda原理 - 阮圣伟 | Blog
         
     </title>
 
-    <link rel="canonical" href="http://www.huweihuang.com/archive/线程、线程池几个有意思的问题/">
+    <link rel="canonical" href="http://www.huweihuang.com/archive/Lambda原理/">
 
     <!-- Bootstrap Core CSS -->
     <link rel="stylesheet" href="/css/bootstrap.min.css">
@@ -88,16 +88,12 @@
                     <div class="post-heading">
                         <div class="tags">
                             
-                              <a class="tag" href="/tags/#开心一刻" title="开心一刻">开心一刻</a>
-                            
-                              <a class="tag" href="/tags/#线程" title="线程">线程</a>
-                            
                         </div>
-                        <h1>线程、线程池几个有意思的问题</h1>
-                        <h2 class="subheading">HashMap 多线程扩容如何形成环的 线程池参数 线程池集群 线程之间按顺序执行</h2>
+                        <h1>Lambda原理</h1>
+                        <h2 class="subheading"></h2>
                         <span class="meta">
                             Posted by 阮圣伟 on
-                            2019-06-11
+                            2019-06-22
                         </span>
                     </div>
                 
@@ -214,50 +210,34 @@
                 col-md-10 col-md-offset-1
                 post-container">
 
-                <h3 id="hashmap-多线程扩容如何形成环的">HashMap 多线程扩容如何形成环的</h3>
+                <h3 id="lambda用法">Lambda用法</h3>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">LambdaDemo</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        Func add = (x, y) -&gt; x + y;</span><br><span class="line">        System.out.println(add.exec(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line">    &#125;</span><br><span class="line">  	<span class="meta">@FunctionalInterface</span></span><br><span class="line">		<span class="class"><span class="keyword">interface</span> <span class="title">Func</span> </span>&#123;</span><br><span class="line">        <span class="function"><span class="keyword">int</span> <span class="title">exec</span><span class="params">(<span class="keyword">int</span> x, <span class="keyword">int</span> y)</span></span>;</span><br><span class="line">		&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="lambda原理">Lambda原理</h3>
 <ul>
 <li>
-<p>简而言之。当扩容时，HashMap 扩大bucket 后，需要rehash 所有的值，放到新的位置之下。</p>
+<p>Lambda 表达式并不仅仅是匿名内部类的语法糖。在 JVM 层面，Lambda表达式和匿名内部类有着明显的差别。</p>
 </li>
 <li>
-<p>当其中一个位置存在冲突（具有链表）时，线程A和线程B 都会去重新计算位置（链表中每个值的新位置）。</p>
+<p>匿名内部类在编译之后会生成一个内部类的class文件。例如 <strong>LambdaDemo$1.class</strong></p>
 </li>
 <li>
-<p>因为是链表，需要一个一个遍历下去，所以有两个引用，一个是当前的e 一个是next。算好e的位置后，再获取next的next，然后算next的位置。<br>
-	 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">do</span> &#123;</span><br><span class="line">  	<span class="comment">//next 是老的链表中的下一个，临时保存一下</span></span><br><span class="line">    Entry&lt;K,V&gt; next = e.next; <span class="comment">// &lt;--假设线程一执行到这里就被调度挂起了</span></span><br><span class="line">  	<span class="comment">//算出新的位置</span></span><br><span class="line">    <span class="keyword">int</span> i = indexFor(e.hash, newCapacity);</span><br><span class="line">  	<span class="comment">//把新位置的头元素赋值为这个元素（e）的next</span></span><br><span class="line">    e.next = newTable[i];</span><br><span class="line">  	<span class="comment">//把 e 赋值为新位置的头元素</span></span><br><span class="line">    newTable[i] = e;</span><br><span class="line">    <span class="comment">//e 更改引用。换成老链表中的值，继续搞下一个</span></span><br><span class="line">    e = next;</span><br><span class="line">&#125; <span class="keyword">while</span> (e != <span class="keyword">null</span>);</span><br></pre></td></tr></table></figure></p>
+<p>Lambda 表达式则是编译时生成一个静态方法。在运行时生成一个动态的内部类调用这个静态方法。</p>
 </li>
 <li>
-<p>在遍历过程中，是从头开始遍历([bucket i]-&gt;3-&gt;7-&gt;null 从3开始 )。然后摆放时，把最新的摆放在新的头的位置（如果在新的长度mod之后还是在新的位置产生冲突后最终结果为[new bucket i]-&gt;7-&gt;3-&gt;null）。</p>
-</li>
-<li>
-<p>当两个线程同时开始rehash时，线程A在获取完e和next后被挂起。</p>
-</li>
-<li>
-<p>当线程B完成rehash之后。线程A开始rehash。</p>
+<p>Lambda 表达式生成内部类的方式通过 <strong>invokedynamic</strong> 指令完成</p>
 <ul>
-<li>A 的 e 指向3 老链表next 指向 7</li>
-<li>A 将 3 赋值为新位置的头元素。然后e变为老链表next 的值 7。然后要获取老链表next的next 7后面是3</li>
-<li>然后e（7）变为头元素（后一个元素为3）。e（7）的下一个新链表next为3。</li>
-<li>此时 老链表next为3 所以3 又被赋值为 头元素。3的新链表next变成原来是头元素的7</li>
-<li>老的链表中next已经为空。</li>
-<li>最后新链表中 3的next 为 7 。7 的next为 3。导致环形链表</li>
-<li>究其原因是原先只需要 3 7 算一下。最后变成了 3 7 3 算了三次。最后的 3 连到了 头元素 导致环形</li>
+<li>
+<p><strong>invokedynamic</strong>指令通过<strong>java.lang.invoke.LambdaMetafactory#metafactory</strong>方法生成目标对象</p>
+</li>
+<li>
+<p>可以使用<strong>java -Djdk.internal.lambda.dumpProxyClasses=&lt;path_to_your_dump_directory&gt;  &lt;.java文件路径&gt;</strong> 生成 Lambda表达式对应的运行时生成的类</p>
+</li>
 </ul>
 </li>
 </ul>
-<h3 id="线程池参数">线程池参数</h3>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">*·corePool：核心线程池的大小。</span></span><br><span class="line"><span class="comment"> ·maximumPool：最大线程池的大小。</span></span><br><span class="line"><span class="comment"> ·keepAliveTime：线程存活时间</span></span><br><span class="line"><span class="comment"> ·TimeUnit：线程存活时间单位(SECONDS、MINUTES...)</span></span><br><span class="line"><span class="comment"> ·BlockingQueue：用来暂时保存任务的工作队列。</span></span><br><span class="line"><span class="comment"> ·RejectedExecutionHandler：当ThreadPoolExecutor已经关闭或ThreadPoolExecutor已经饱和</span></span><br><span class="line"><span class="comment">时（达到了最大线程池大小且工作队列已满），execute()方法将要调用的Handler。</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="title">ThreadPoolExecutor</span><span class="params">(<span class="keyword">int</span> corePoolSize,</span></span></span><br><span class="line"><span class="function"><span class="params">                          <span class="keyword">int</span> maximumPoolSize,</span></span></span><br><span class="line"><span class="function"><span class="params">                          <span class="keyword">long</span> keepAliveTime,</span></span></span><br><span class="line"><span class="function"><span class="params">                          TimeUnit unit,</span></span></span><br><span class="line"><span class="function"><span class="params">                          BlockingQueue&lt;Runnable&gt; workQueue,</span></span></span><br><span class="line"><span class="function"><span class="params">                          ThreadFactory threadFactory,</span></span></span><br><span class="line"><span class="function"><span class="params">                          RejectedExecutionHandler handler)</span></span></span><br></pre></td></tr></table></figure>
-<h3 id="线程池集群">线程池集群</h3>
-<blockquote>
-<p>有一个很有意思的问题：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&gt; 集群、每个集群有一个线程池，现在有很多个任务，有的任务计算量很大，有的任务IO量很大计算量很小。现在去每个线程池去拉取任务执行，有可能有的线程池总是拉取到计算量很大的任务，有的总是拉取到计算量很小的任务。如何优化？</span><br><span class="line">&gt;</span><br></pre></td></tr></table></figure>
-</blockquote>
-<p>我假设前提应该是一个线程池，这个不改变的情况下进行优化。</p>
-<p>我想到的有可以通过信号量来控制 IO 和 Cpu的任务总数。在判断信号量之后submit 任务。也可通过状态机等进行控制，原理同信号量相似。</p>
-<p><a href="https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/ThreadPoolCpuAndIOTasksDemo.java" target="_blank" rel="noopener">https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/ThreadPoolCpuAndIOTasksDemo.java</a></p>
-<h3 id="线程之间按顺序执行">线程之间按顺序执行</h3>
-<p>这个问题的方法就很多。可以通过join、状态机、lockSupport等方式实现</p>
-<p><a href="https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/SequentiallyThread.java" target="_blank" rel="noopener">https://github.com/ruanshengwei/code-snippets/blob/master/java-language/src/main/java/com/github/ruanshengwei/javalang/concurrent/thread/SequentiallyThread.java</a></p>
+<h3 id="根据原理翻译的等价的最终执行代码">根据原理，翻译的等价的最终执行代码</h3>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">LambdaDemo</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        Func add = <span class="keyword">new</span> LambdaTest$$Lambda$<span class="number">1</span>();</span><br><span class="line">        System.out.println(add.exec(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">int</span> lambda$main$<span class="number">0</span>(<span class="keyword">int</span> x, <span class="keyword">int</span> y) &#123;</span><br><span class="line">        <span class="keyword">return</span> x + y;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">LambdaTest</span>$$<span class="title">Lambda</span>$1 <span class="keyword">implements</span> <span class="title">Func</span> </span>&#123;</span><br><span class="line">        <span class="keyword">private</span> LambdaTest$$Lambda$<span class="number">1</span>() &#123;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">int</span> <span class="title">exec</span><span class="params">(<span class="keyword">int</span> x, <span class="keyword">int</span> y)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> LambdaTest.lambda$main$<span class="number">0</span>(x, y);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="meta">@FunctionalInterface</span></span><br><span class="line"><span class="class"><span class="keyword">interface</span> <span class="title">Func</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">exec</span><span class="params">(<span class="keyword">int</span> x, <span class="keyword">int</span> y)</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>​</p>
 
                 
 
@@ -265,13 +245,9 @@
                 <!-- Pager -->
                 <ul class="pager">
                     
-                        <li class="previous">
-                            <a href="/archive/ThreadLocal与WeakReference/" data-toggle="tooltip" data-placement="top" title="ThreadLocal与WeakReference">&larr; Previous Post</a>
-                        </li>
-                    
                     
                         <li class="next">
-                            <a href="/archive/tk通用mapper-Optional支持/" data-toggle="tooltip" data-placement="top" title="tk通用mapper Optional支持">Next Post &rarr;</a>
+                            <a href="/archive/Java代理探究/" data-toggle="tooltip" data-placement="top" title="Java代理探究">Next Post &rarr;</a>
                         </li>
                     
                 </ul>
@@ -322,7 +298,7 @@
         <div id="toc" class="toc-article">
         <strong class="toc-title">Contents</strong>
         
-          <ol class="toc-nav"><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#hashmap-多线程扩容如何形成环的"><span class="toc-nav-number">1.</span> <span class="toc-nav-text">HashMap &#x591A;&#x7EBF;&#x7A0B;&#x6269;&#x5BB9;&#x5982;&#x4F55;&#x5F62;&#x6210;&#x73AF;&#x7684;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#线程池参数"><span class="toc-nav-number">2.</span> <span class="toc-nav-text">&#x7EBF;&#x7A0B;&#x6C60;&#x53C2;&#x6570;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#线程池集群"><span class="toc-nav-number">3.</span> <span class="toc-nav-text">&#x7EBF;&#x7A0B;&#x6C60;&#x96C6;&#x7FA4;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#线程之间按顺序执行"><span class="toc-nav-number">4.</span> <span class="toc-nav-text">&#x7EBF;&#x7A0B;&#x4E4B;&#x95F4;&#x6309;&#x987A;&#x5E8F;&#x6267;&#x884C;</span></a></li></ol>
+          <ol class="toc-nav"><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#lambda用法"><span class="toc-nav-number">1.</span> <span class="toc-nav-text">Lambda&#x7528;&#x6CD5;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#lambda原理"><span class="toc-nav-number">2.</span> <span class="toc-nav-text">Lambda&#x539F;&#x7406;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#根据原理翻译的等价的最终执行代码"><span class="toc-nav-number">3.</span> <span class="toc-nav-text">&#x6839;&#x636E;&#x539F;&#x7406;&#xFF0C;&#x7FFB;&#x8BD1;&#x7684;&#x7B49;&#x4EF7;&#x7684;&#x6700;&#x7EC8;&#x6267;&#x884C;&#x4EE3;&#x7801;</span></a></li></ol>
         
         </div>
       </aside>
@@ -342,10 +318,6 @@
                     <h5><a href="/tags/">FEATURED TAGS</a></h5>
                     <div class="tags">
                        
-                          <a class="tag" href="/tags/#开心一刻" title="开心一刻">开心一刻</a>
-                        
-                          <a class="tag" href="/tags/#线程" title="线程">线程</a>
-                        
                     </div>
                 </section>
                 
