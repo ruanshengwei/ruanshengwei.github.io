@@ -14,11 +14,11 @@
     <script async defer src="https://buttons.github.io/buttons.js"></script>
     <title>
         
-          Lambda原理 - 阮圣伟 | Blog
+          Lambda Serializable问题 - 阮圣伟 | Blog
         
     </title>
 
-    <link rel="canonical" href="http://www.huweihuang.com/archive/Lambda原理/">
+    <link rel="canonical" href="http://www.huweihuang.com/archive/Lambda-Serializable问题/">
 
     <!-- Bootstrap Core CSS -->
     <link rel="stylesheet" href="/css/bootstrap.min.css">
@@ -88,12 +88,16 @@
                     <div class="post-heading">
                         <div class="tags">
                             
+                              <a class="tag" href="/tags/#开心一刻" title="开心一刻">开心一刻</a>
+                            
+                              <a class="tag" href="/tags/#java-lang" title="java-lang">java-lang</a>
+                            
                         </div>
-                        <h1>Lambda原理</h1>
+                        <h1>Lambda Serializable问题</h1>
                         <h2 class="subheading"></h2>
                         <span class="meta">
                             Posted by 阮圣伟 on
-                            2019-06-22
+                            2019-06-26
                         </span>
                     </div>
                 
@@ -210,34 +214,44 @@
                 col-md-10 col-md-offset-1
                 post-container">
 
-                <h3 id="lambda用法">Lambda用法</h3>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">LambdaDemo</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        Func add = (x, y) -&gt; x + y;</span><br><span class="line">        System.out.println(add.exec(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line">    &#125;</span><br><span class="line">  	<span class="meta">@FunctionalInterface</span></span><br><span class="line">		<span class="class"><span class="keyword">interface</span> <span class="title">Func</span> </span>&#123;</span><br><span class="line">        <span class="function"><span class="keyword">int</span> <span class="title">exec</span><span class="params">(<span class="keyword">int</span> x, <span class="keyword">int</span> y)</span></span>;</span><br><span class="line">		&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="lambda原理">Lambda原理</h3>
+                <h3 id="lambda-serializable">Lambda Serializable</h3>
+<p>在研究Lambda的原理时，看到了一个很有意思的问题。<a href="https://www.zhihu.com/question/51491241/answer/126232275" target="_blank" rel="noopener">Java中普通lambda表达式和方法引用本质上有什么区别？</a></p>
+<p>其中的提问者遇到了在使用 Lambda 表达式 <strong>foreach(System.out::println</strong>) 的时候 抛出PrintStream没有序列化的异常。而使用 <strong>foreach(item-&gt;System.out.println(item))</strong> 则没有问题。总结了如下几点。</p>
 <ul>
 <li>
-<p>Lambda 表达式并不仅仅是匿名内部类的语法糖。在 JVM 层面，Lambda表达式和匿名内部类有着明显的差别。</p>
+<p>Lambda表达式在运行过程中会通过<strong>invokedynamic</strong>生成一个匿名类</p>
 </li>
 <li>
-<p>匿名内部类在编译之后会生成一个内部类的class文件。例如 <strong>LambdaDemo$1.class</strong></p>
+<p><strong>invokedynamic</strong>是通过实现函数式接口来生成动态类的</p>
 </li>
 <li>
-<p>Lambda 表达式则是编译时生成一个静态方法。在运行时生成一个动态的内部类调用这个静态方法。</p>
+<p>当函数式接口继承自  <strong>Serializable</strong> 接口时，意味着生成的这个匿名类有序列化的需求，也要实现 Serializable接口。会自动生成一个**writeReplace() **方法用于序列化。</p>
 </li>
 <li>
-<p>Lambda 表达式生成内部类的方式通过 <strong>invokedynamic</strong> 指令完成</p>
+<p>在匿名类的生成过程中分了三种情况</p>
 <ul>
 <li>
-<p><strong>invokedynamic</strong>指令通过<strong>java.lang.invoke.LambdaMetafactory#metafactory</strong>方法生成目标对象</p>
-</li>
-<li>
-<p>可以使用<strong>java -Djdk.internal.lambda.dumpProxyClasses=&lt;path_to_your_dump_directory&gt;  &lt;.java文件路径&gt;</strong> 生成 Lambda表达式对应的运行时生成的类</p>
+<p><code>s -&gt; System.out.println(s)</code> 是一个没有任何&quot;自由变量&quot;(free variable)的Lambda表达式，不需要从外围环境中捕获任何变量。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">final</span> Object <span class="title">writeReplace</span><span class="params">()</span> </span>&#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="keyword">new</span> SerializedLambda(</span><br><span class="line">               Demo.class,</span><br><span class="line">               <span class="string">"org/apache/spark/api/java/function/VoidFunction"</span>,</span><br><span class="line">               <span class="string">"call"</span>,</span><br><span class="line">               <span class="string">"(Ljava/lang/Object;)V"</span>,</span><br><span class="line">               <span class="number">6</span>,</span><br><span class="line">               <span class="string">"Demo"</span>,</span><br><span class="line">               <span class="string">"lambda$main$28d50090$1"</span>,</span><br><span class="line">               <span class="string">"(Ljava/lang/String;)V"</span>,</span><br><span class="line">               <span class="string">"(Ljava/lang/String;)V"</span>,</span><br><span class="line">               <span class="keyword">new</span> Object[<span class="number">0</span>]);<span class="comment">//没有捕捉引用变量。</span></span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
 </li>
 </ul>
 </li>
 </ul>
-<h3 id="根据原理翻译的等价的最终执行代码">根据原理，翻译的等价的最终执行代码</h3>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">LambdaDemo</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        Func add = <span class="keyword">new</span> LambdaTest$$Lambda$<span class="number">1</span>();</span><br><span class="line">        System.out.println(add.exec(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">int</span> lambda$main$<span class="number">0</span>(<span class="keyword">int</span> x, <span class="keyword">int</span> y) &#123;</span><br><span class="line">        <span class="keyword">return</span> x + y;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">LambdaTest</span>$$<span class="title">Lambda</span>$1 <span class="keyword">implements</span> <span class="title">Func</span> </span>&#123;</span><br><span class="line">        <span class="keyword">private</span> LambdaTest$$Lambda$<span class="number">1</span>() &#123;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">int</span> <span class="title">exec</span><span class="params">(<span class="keyword">int</span> x, <span class="keyword">int</span> y)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> LambdaTest.lambda$main$<span class="number">0</span>(x, y);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="meta">@FunctionalInterface</span></span><br><span class="line"><span class="class"><span class="keyword">interface</span> <span class="title">Func</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">exec</span><span class="params">(<span class="keyword">int</span> x, <span class="keyword">int</span> y)</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>​</p>
+<ul>
+<li>
+<p>使用 Method Reference <code>System.out::println</code>，这是一个实例方法的method reference，会引用到System.out这是实例。所以也会捕获这个实例。而这个实例在匿名类需要序列化时也要被序列化一并传递或存储起来。所以这个属于capture-by-value，这个变量会通过Lambda匿名类的构造函数被保存起来。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">final</span> Object <span class="title">writeReplace</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> SerializedLambda(</span><br><span class="line">             Demo.class,</span><br><span class="line">             <span class="string">"org/apache/spark/api/java/function/VoidFunction"</span>,</span><br><span class="line">             <span class="string">"call"</span>,</span><br><span class="line">             <span class="string">"(Ljava/lang/Object;)V"</span>,</span><br><span class="line">             <span class="number">5</span>,</span><br><span class="line">             <span class="string">"java/io/PrintStream"</span>,</span><br><span class="line">             <span class="string">"println"</span>,</span><br><span class="line">             <span class="string">"(Ljava/lang/String;)V"</span>,</span><br><span class="line">             <span class="string">"(Ljava/lang/String;)V"</span>,</span><br><span class="line">             <span class="keyword">new</span> Object[] &#123; <span class="keyword">this</span>.arg$<span class="number">1</span> &#125;);<span class="comment">//捕捉了引用的变量。需要把这个变量序列化</span></span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+<pre><code>而静态Method Reference则不会捕捉变量。和第一种情况类似。
+</code></pre>
+<ul>
+<li>
+<p><code>PrintStream sysout = System.out; s -&gt; sysout.println(s)</code> 。这是一个带有一个自由量“sysout”的lambda表达式。它需要从环境中捕获sysout局部变量的值才可以正确运行。所以这种lambda也叫做capturing lambda。和第二种情况一样。也是需要捕捉引用变量，并将其序列化的。而其他那些参数，只是传递一个符号而已。</p>
+<p><strong>SerializedLambda对象来包装起这些符号信息和这个引用的变量</strong></p>
+</li>
+</ul>
+<p><strong>最后:以后在使用 继承自 Serializable 接口的函数式接口时，需要避免捕捉一些没有实现序列化的变量。防止出现这个问题。</strong></p>
 
                 
 
@@ -245,13 +259,9 @@
                 <!-- Pager -->
                 <ul class="pager">
                     
-                        <li class="previous">
-                            <a href="/archive/Lambda-Serializable问题/" data-toggle="tooltip" data-placement="top" title="Lambda Serializable问题">&larr; Previous Post</a>
-                        </li>
-                    
                     
                         <li class="next">
-                            <a href="/archive/Java代理探究/" data-toggle="tooltip" data-placement="top" title="Java代理探究">Next Post &rarr;</a>
+                            <a href="/archive/Lambda原理/" data-toggle="tooltip" data-placement="top" title="Lambda原理">Next Post &rarr;</a>
                         </li>
                     
                 </ul>
@@ -302,7 +312,7 @@
         <div id="toc" class="toc-article">
         <strong class="toc-title">Contents</strong>
         
-          <ol class="toc-nav"><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#lambda用法"><span class="toc-nav-number">1.</span> <span class="toc-nav-text">Lambda&#x7528;&#x6CD5;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#lambda原理"><span class="toc-nav-number">2.</span> <span class="toc-nav-text">Lambda&#x539F;&#x7406;</span></a></li><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#根据原理翻译的等价的最终执行代码"><span class="toc-nav-number">3.</span> <span class="toc-nav-text">&#x6839;&#x636E;&#x539F;&#x7406;&#xFF0C;&#x7FFB;&#x8BD1;&#x7684;&#x7B49;&#x4EF7;&#x7684;&#x6700;&#x7EC8;&#x6267;&#x884C;&#x4EE3;&#x7801;</span></a></li></ol>
+          <ol class="toc-nav"><li class="toc-nav-item toc-nav-level-3"><a class="toc-nav-link" href="#lambda-serializable"><span class="toc-nav-number">1.</span> <span class="toc-nav-text">Lambda Serializable</span></a></li></ol>
         
         </div>
       </aside>
@@ -322,6 +332,10 @@
                     <h5><a href="/tags/">FEATURED TAGS</a></h5>
                     <div class="tags">
                        
+                          <a class="tag" href="/tags/#开心一刻" title="开心一刻">开心一刻</a>
+                        
+                          <a class="tag" href="/tags/#java-lang" title="java-lang">java-lang</a>
+                        
                     </div>
                 </section>
                 
